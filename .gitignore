@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Environment variables
+.env
+backend/.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker volumes / runtime data
+mongo_data/
+
+# OS specific
+.DS_Store
+Thumbs.db
