@@ -1,4 +1,4 @@
-# Layer 7 Load Balancing with Node.js and Docker
+# SD Exp 2: Layer 7 Load Balancing with Node.js and Docker
 
 A practical implementation of Layer 7 (Application Layer) Load Balancing across multiple containerized Node.js/Express backend instances using Docker Compose.
 
