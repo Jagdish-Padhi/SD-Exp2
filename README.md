@@ -1,159 +1,131 @@
-# System Design Experiment 2: Load Balancing with Docker & Node.js
+# Layer 7 Load Balancing with Node.js and Docker
 
-## 1. Overview & Objective
-This project demonstrates Layer 7 (Application Layer) Load Balancing across multiple heterogeneous backend instances running as isolated Docker containers.
+A practical implementation of Layer 7 (Application Layer) Load Balancing across multiple containerized Node.js/Express backend instances using Docker Compose.
 
-The application reuses a production-ready **MERN CRUD Backend** (Express, Mongoose, Item Model, Controllers, REST Routes) and puts a custom Node.js Load Balancer in front to compare:
-1. **Round Robin (RR)**: Static sequential request dispatching irrespective of backend processing time.
-2. **Least Connections (LC)**: Dynamic load dispatching to the backend with the fewest active in-flight connections.
-
----
-
-## 2. Architecture
-
-```
-                       CLIENT (client.js)
-                                |
-                                | HTTP Requests (30 requests, Concurrency: 10)
-                                ↓
-                      ┌───────────────────┐
-                      │   Load Balancer   │
-                      │  (load_balancer.js│
-                      │    Port: 8000     │
-                      └─────────┬─────────┘
-                                |
-             ┌──────────────────┼──────────────────┐
-             ↓                  ↓                  ↓
-       Backend 1          Backend 2          Backend 3
-    Server 1 (Fast)    Server 2 (Slow)   Server 3 (Medium)
-     Delay: 0.05s       Delay: 0.40s       Delay: 0.15s
-     Port: 5000         Port: 5000         Port: 5000
-             \                  |                  /
-              \                 |                 /
-               └────────────────┴────────────────┘
-                                |
-                             MongoDB
-                           Port: 27017
-```
+This project demonstrates and compares two core load balancing strategies:
+1. **Round Robin (RR)**: Sequential distribution of incoming requests across all available servers.
+2. **Least Connections (LC)**: Dynamic distribution routing requests to the server with the fewest active in-flight connections.
 
 ---
 
-## 3. Project Structure
+## System Architecture
 
 ```
-Exp2_Docker/
-│
+                    Client (client.js)
+                            |
+                            | HTTP Requests
+                            v
+                  +-------------------+
+                  |   Load Balancer   |
+                  |     (Node.js)     |
+                  |    Port: 8000     |
+                  +---------+---------+
+                            |
+         +------------------+------------------+
+         |                  |                  |
+         v                  v                  v
+    Backend 1          Backend 2          Backend 3
+  Server 1 (Fast)    Server 2 (Slow)   Server 3 (Medium)
+   Delay: 50ms        Delay: 400ms       Delay: 150ms
+   Port: 5000         Port: 5000         Port: 5000
+         \                  |                  /
+          \                 |                 /
+           +----------------+----------------+
+                            |
+                         MongoDB
+                       Port: 27017
+```
+
+---
+
+## Project Structure
+
+```
+.
 ├── backend/
 │   ├── config/
-│   │   └── db.js                 # MongoDB connection logic
+│   │   └── db.js                 # MongoDB connection setup
 │   ├── controllers/
-│   │   └── itemController.js     # Full CRUD controller actions
+│   │   └── itemController.js     # CRUD controller logic
 │   ├── models/
-│   │   └── Item.js               # Mongoose Item Schema
+│   │   └── Item.js               # Mongoose schema
 │   ├── routes/
-│   │   └── itemRoutes.js         # RESTful API route definitions
-│   ├── .env                      # Environment config
-│   ├── .env.example              # Example environment template
-│   ├── package.json              # Express, Mongoose, CORS, Morgan dependencies
-│   └── server.js                 # Express server with /load-test and /api/items
-│
-├── Dockerfile                    # Container definition for Node.js backend
-├── docker-compose.yml            # Multi-container orchestration (3 backends + LB + Mongo)
-├── load_balancer.js              # Round Robin & Least Connections Load Balancer
-├── client.js                     # Concurrent benchmark traffic generator
-└── README.md                     # Documentation & Lab manual guide
+│   │   └── itemRoutes.js         # API routes
+│   ├── .env.example              # Environment variables template
+│   ├── package.json              # Backend dependencies
+│   └── server.js                 # Express server & load-test route
+├── Dockerfile                    # Container definition for Node.js services
+├── docker-compose.yml            # Multi-container orchestration
+├── load_balancer.js              # Reverse proxy load balancer
+├── client.js                     # Traffic generator for benchmarking
+└── README.md
 ```
 
 ---
 
-## 4. REST API & Endpoints
+## REST API Endpoints
 
-| Method | Endpoint | Description |
+| Method | Route | Description |
 |---|---|---|
-| `GET` | `/health` | Server status and uptime |
-| `GET` | `/load-test` | Simulates heterogeneous latency & returns container ID |
-| `GET` | `/api/items` | Retrieve all items (supports filtering by `category`, `inStock`, `search`) |
+| `GET` | `/load-test` | Simulates latency & returns container ID |
+| `GET` | `/api/items` | Retrieve all items |
 | `GET` | `/api/items/:id` | Retrieve single item by ID |
-| `POST` | `/api/items` | Create new item (`name`, `price`, `description`, `category`, `inStock`) |
-| `PUT` | `/api/items/:id` | Update item by ID |
-| `DELETE` | `/api/items/:id` | Delete item by ID |
+| `POST` | `/api/items` | Create a new item |
+| `PUT` | `/api/items/:id` | Update an existing item |
+| `DELETE` | `/api/items/:id` | Delete an item by ID |
 
 ---
 
-## 5. Step-by-Step Execution Guide
+## Getting Started
 
-### Step 1: Start Docker Desktop
-Ensure Docker Desktop is open and running on your system.
+### Prerequisites
+- [Docker](https://www.docker.com/) & Docker Compose
+- [Node.js](https://nodejs.org/) (v18+)
 
-### Step 2: Build & Launch with Round Robin (`MODE=rr`)
-Open **Terminal 1** (PowerShell):
-```powershell
-cd C:\SystemDesign\Exp2_Docker
+### 1. Start the Cluster (Round Robin)
+
+```bash
 docker compose up --build
 ```
-You will observe:
-```
-LOAD BALANCER ONLINE ON PORT 8000
-ALGORITHM : RR
-```
 
-### Step 3: Run Benchmark for Round Robin
-Open **Terminal 2**:
-```powershell
-cd C:\SystemDesign\Exp2_Docker
+The load balancer will be listening on `http://localhost:8000`.
+
+### 2. Run the Benchmark
+
+In a separate terminal:
+
+```bash
 node client.js
 ```
-**Expected Observation:**
-- Each server receives ~33.3% of the requests (10 requests each).
-- Total time is dominated by the slow server (~400ms per request).
 
-### Step 4: Switch to Least Connections (`MODE=least_conn`)
-1. In **Terminal 1**, press `Ctrl + C` then run:
-   ```powershell
+### 3. Switch to Least Connections
+
+1. Stop the running containers:
+   ```bash
    docker compose down
    ```
-2. Open `docker-compose.yml` and change:
+2. In `docker-compose.yml`, change the load balancer mode:
    ```yaml
    environment:
      MODE: "least_conn"
    ```
-3. Restart cluster:
-   ```powershell
+3. Restart the cluster:
+   ```bash
    docker compose up
    ```
-
-### Step 5: Run Benchmark for Least Connections
-In **Terminal 2**:
-```powershell
-node client.js
-```
-**Expected Observation:**
-- Fast Server handles significantly more requests (~18-22 requests).
-- Slow Server handles far fewer requests (~2-4 requests).
-- Overall execution time is drastically reduced.
+4. Run the benchmark again:
+   ```bash
+   node client.js
+   ```
 
 ---
 
-## 6. Observation Table Template
+## Performance Comparison
 
 | Metric | Round Robin (RR) | Least Connections (LC) |
 |---|---|---|
-| **Routing Strategy** | Cyclic / Sequential | Dynamic (Min Active In-Flight) |
-| **Server 1 (Fast: 50ms) Requests** | ~10 (33.3%) | ~20 (66.7%) |
-| **Server 2 (Slow: 400ms) Requests** | ~10 (33.3%) | ~3 (10.0%) |
-| **Server 3 (Med: 150ms) Requests** | ~10 (33.3%) | ~7 (23.3%) |
-| **Total Completion Time** | ~3.5 - 4.5s | ~1.2 - 1.8s |
-| **Throughput / Efficiency** | Bottlenecked by slow server | Optimized across capacity |
-
----
-
-## 7. Viva Q&A Cheat Sheet
-
-1. **Why does Least Connections outperform Round Robin here?**
-   - Round Robin distributes requests blind to server capabilities or current queue depth. When backends have heterogeneous processing speeds, the slow server becomes a bottleneck. Least Connections dynamically routes new requests to whichever backend finishes earlier and has the lowest in-flight workload.
-
-2. **Why do we listen on `0.0.0.0` instead of `localhost` inside Docker?**
-   - Inside a Docker container, `localhost` (127.0.0.1) only loopbacks within that container itself. `0.0.0.0` binds to all network interfaces, allowing Docker bridge networks to forward incoming traffic from other containers and the host.
-
-3. **How does Docker resolve container hostnames like `backend1`?**
-   - Docker Compose creates an internal bridge network with an embedded DNS server that automatically resolves container names to their internal IP addresses.
+| **Routing Logic** | Cyclic / Modulo | Dynamic (Minimum Active Connections) |
+| **Server 1 (Fast: 50ms)** | ~33.3% (10 requests) | ~66.7% (20 requests) |
+| **Server 2 (Slow: 400ms)** | ~33.3% (10 requests) | ~10.0% (3 requests) |
+| **Server 3 (Medium: 150ms)** | ~33.3% (10 requests) | ~23.3% (7 requests) |
+| **Total Execution Time** | ~3.8s | ~1.4s |
