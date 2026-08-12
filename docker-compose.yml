@@ -1,0 +1,46 @@
+services:
+  backend1:
+    build: .
+    environment:
+      SERVER_NAME: "Server 1 (Fast)"
+      DELAY: "0.05"
+      MONGO_URI: "mongodb://mongodb:27017/sd_exp2"
+    command: npm start
+
+  backend2:
+    build: .
+    environment:
+      SERVER_NAME: "Server 2 (Slow)"
+      DELAY: "0.40"
+      MONGO_URI: "mongodb://mongodb:27017/sd_exp2"
+    command: npm start
+
+  backend3:
+    build: .
+    environment:
+      SERVER_NAME: "Server 3 (Medium)"
+      DELAY: "0.15"
+      MONGO_URI: "mongodb://mongodb:27017/sd_exp2"
+    command: npm start
+
+  load_balancer:
+    build: .
+    command: node load_balancer.js
+    ports:
+      - "8000:8000"
+    environment:
+      MODE: "rr"
+    depends_on:
+      - backend1
+      - backend2
+      - backend3
+
+  mongodb:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:
